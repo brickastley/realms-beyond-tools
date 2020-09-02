@@ -43,10 +43,12 @@ function xpath(path, root)
     if (!root)
         root = document;
     var result = document.evaluate(path, root, null, XPathResult.ORDERED_NODE_SNAPSHOT_TYPE, null);
+  	console.log(result);
     var nodes = [];
     for (var i = 0; i < result.snapshotLength; i++) {
         nodes[i] = result.snapshotItem(i);
     }
+  	console.log(nodes);
     return nodes;
 }
 
@@ -237,7 +239,8 @@ function countSpoileredQuotes(quotes) {
 
 function getPost(postTable) {
 	if(isVBulletin) return getVBulletinPost(postTable);
-	if (!postTable || postTable.nodeName != "TABLE") { GM_log("error 11"); return null; }
+  console.log(postTable);
+	if (!postTable || postTable.nodeName != "TABLE") { console.log("error 11"); return null; }
 	var post = {
 		table: postTable,
 		id: postTable.id.replace("post_", "")*1,
@@ -278,7 +281,7 @@ function getPost(postTable) {
 }
 
 function getVBulletinPost(postTable) {
-	if (!postTable || !postTable.parentNode || !postTable.parentNode.parentNode) { GM_log("error 11"); return null; }
+	if (!postTable || !postTable.parentNode || !postTable.parentNode.parentNode) { console.log("error 11"); return null; }
 	postTable = postTable.parentNode.parentNode;
 	var post = {
 		table: postTable,
@@ -330,8 +333,8 @@ function joinObjects(objects, fieldName, separator, transform) {
 
 function getPosts() {
 	var posts = [];
-    var r = isVBulletin ? xpath("//li[contains(@class, 'postcontainer')]/div[contains(@class, 'postdetails')]/div[contains(@class, 'userinfo')]") : xpath("//tr/td[contains(@class, 'post_author')]/strong/span/a");
-    if (!r) { GM_log("error 10"); return []; }
+    var r = isVBulletin ? xpath("//li[contains(@class, 'postcontainer')]/div[contains(@class, 'postdetails')]/div[contains(@class, 'userinfo')]") : xpath("//div[contains(@class, 'author_information')]/strong/span/a");
+    if (!r) { console.log("error 10"); return []; }
     for (var i = 0; i < r.length; i++) {
         var postTable = isVBulletin ? r[i] : r[i].parentNode.parentNode.parentNode.parentNode.parentNode.parentNode.parentNode.parentNode.parentNode.parentNode;
 		var post = getPost(postTable);
@@ -814,9 +817,8 @@ function fixHeader(filters) {
 		else {
 			var postsDiv = document.getElementById("posts");
 			if(postsDiv) {
-				var titleTable = postsDiv.previousElementSibling || previousSibling;
-				var modeDiv = titleTable.children[0].children[0].children[0].children[0];
-				insertBeforeDiv = modeDiv.children[0]
+				var titleTable = postsDiv.previousElementSibling || postsDiv.previousSibling;
+        insertBeforeDiv = postsDiv.parentNode.parentNode.previousSibling.previousSibling.children[0].children[1]
 			}
 		}
         if(!insertBeforeDiv) return;
