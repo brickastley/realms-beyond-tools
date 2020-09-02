@@ -3,7 +3,9 @@
 // @namespace realmsbeyond
 // @description	Allows you to filter threads on poster and perform automatic votecounts
 // @include	http://realmsbeyond.net/forums/*
+// @include	https://realmsbeyond.net/forums/*
 // @include	http://www.realmsbeyond.net/forums/*
+// @include	https://www.realmsbeyond.net/forums/*
 // @include	http://forums.totalwar.org/*
 // @grant GM_getValue
 // @grant GM_setValue
