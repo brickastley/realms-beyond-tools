@@ -3,10 +3,7 @@
 // @namespace realmsbeyond
 // @description	Allows you to filter threads on poster and perform automatic votecounts
 // @include	http://realmsbeyond.net/forums/*
-// @include	https://realmsbeyond.net/forums/*
 // @include	http://www.realmsbeyond.net/forums/*
-// @include	https://www.realmsbeyond.net/forums/*
-// @include	http://forums.totalwar.org/*
 // @grant GM_getValue
 // @grant GM_setValue
 // @grant GM_deleteValue
@@ -15,9 +12,6 @@
 
 // Check compatibility:
 var notSupported = false;
-var isVBulletin = false;
-var postsByPostId = {};
-
 try {
 	if (!this.GM_getValue || (this.GM_getValue.toString && this.GM_getValue.toString().indexOf("not supported")>-1)) {
 		notSupported = true;
@@ -66,29 +60,13 @@ function getCurrentThreadId() {
     if (url.match(/showthread\.php.*(\?|\&)tid=(\d+)/)) {			
         threadId = "t" + RegExp.$2;
     }
-    else if (url.match(/showthread\.php\?(\d+)/)) {			
-        threadId = "t" + RegExp.$1;
-    }
 	_currentThreadId = threadId;
     return threadId;
 }
 
 function _countVote(postNode, voteSpan, votesByPostNumber, aliases, colorFunction, voteType) {
-	if(!colorFunction || (voteSpan.style && colorFunction(voteSpan.style.color))) {
-		var votee = (voteSpan.innerText || voteSpan.textContent).trim().replace(/\s/g," ").replace(/'/g,"").replace(/\s*[:,;]+\s*/g,":");
-        console.log("Votee: " + votee);
-		if(isVBulletin) {
-			if(votee.toUpperCase() == "UNVOTE" || votee.toUpperCase().startsWith("UNVOTE:") || votee.toUpperCase().startsWith("UNVOTE ")) {
-				votee = " " + votee.substring(7).trim();
-				var idx = Math.max(votee.toUpperCase().indexOf(":VOTE:"), votee.toUpperCase().indexOf(" VOTE:"), votee.toUpperCase().indexOf(":VOTE "), votee.toUpperCase().indexOf(" VOTE "));
-				if(idx >= 0)
-					votee = votee.substring(idx+1);
-				else
-					votee = "Vote: Unvote";
-			}
-			if(!votee.toUpperCase().startsWith("VOTE:") && !votee.toUpperCase().startsWith("VOTE ")) return;
-			votee = votee.substring(5).trim();
-		}
+	if(voteSpan.style && colorFunction(voteSpan.style.color)) {
+		var votee = (voteSpan.innerText || voteSpan.textContent).trim().replace(/'/g, "");
 		votee = getCanonicalPlayerName(votee, aliases);
 		var post = getPost(postNode);
 		votesByPostNumber["p" + post.postNumber] = votesByPostNumber["p" + post.postNumber] || [];
@@ -102,13 +80,8 @@ function _countVote(postNode, voteSpan, votesByPostNumber, aliases, colorFunctio
 function _countVoteRecursively(postNode, voteSpan, votesByPostNumber, aliases, colorFunction) {
     var child = voteSpan.firstElementChild || voteSpan.firstChild || null;
     if(!(child && child.nodeName == "SPAN" && _countVoteRecursively(postNode, child, votesByPostNumber, aliases))) {
-		if(isVBulletin) {
-			_countVote(postNode, voteSpan, votesByPostNumber, aliases, null, "Bold");
-		}
-		else {
-			_countVote(postNode, voteSpan, votesByPostNumber, aliases, isColorReddish, "Red");
-			_countVote(postNode, voteSpan, votesByPostNumber, aliases, isColorGreenish, "Green");
-		}
+        _countVote(postNode, voteSpan, votesByPostNumber, aliases, isColorReddish, "Red");
+        _countVote(postNode, voteSpan, votesByPostNumber, aliases, isColorGreenish, "Green");
     }
 }
 
@@ -154,7 +127,7 @@ function addAliases(aliasLists, aliasTexts) {
 
 function findAliases(threadId, filters) {
 	filters[threadId].aliases = filters[threadId].aliases || [];
-    var aliasNodes = isVBulletin ? xpath("//div[contains(@class, 'postbody')]/div/div/div/blockquote/ul/li") : xpath("//tr/td/div[contains(@class, 'post_body')]/ul/li").concat(xpath("//tr/td/div[contains(@class, 'post_body')]/span/ul/li"));
+    var aliasNodes = xpath("//tr/td/div[contains(@class, 'post_body')]/ul/li").concat(xpath("//tr/td/div[contains(@class, 'post_body')]/span/ul/li"));
     if(aliasNodes) for(var v = 0; v < aliasNodes.length; v++) {
         try {
             var aliasNode = aliasNodes[v];
@@ -175,8 +148,8 @@ function findAliases(threadId, filters) {
 function countVotes(threadId, filters) {
 	var aliases = filters[threadId].aliases || [];
     var votesByPostNumber = {};
-    var votes = isVBulletin ? [].concat(xpath("//div[contains(@class, 'postbody')]/div/div/div/blockquote/b"), xpath("//div[contains(@class, 'postbody')]/div/div/div/blockquote/font")) : xpath("//tr/td/div[contains(@class, 'post_body')]/span");
-    console.log("Counting votes. Found " + (votes ? votes.length : null) + " potential votes.");
+    var votes = xpath("//tr/td/div[contains(@class, 'post_body')]/span");
+    //console.log("Counting votes. Found " + (votes ? votes.length : null) + " potential votes.");
     if(votes) for(var v = 0; v < votes.length; v++) {
         try {
             var voteSpan = votes[v];
@@ -236,7 +209,6 @@ function countSpoileredQuotes(quotes) {
 }
 
 function getPost(postTable) {
-	if(isVBulletin) return getVBulletinPost(postTable);
 	if (!postTable || postTable.nodeName != "TABLE") { GM_log("error 11"); return null; }
 	var post = {
 		table: postTable,
@@ -248,7 +220,7 @@ function getPost(postTable) {
         buttonRow: postTable.children[0].children[3],
 		postRows: [],
 		menu: null
-	};
+	}
     var userAnchor = post.avatarRow.children[0].children[0].children[0].children[0].children[1].children[0].children[0].children[0];
 	post.userName = userAnchor.innerText ? userAnchor.innerText : userAnchor.textContent;
 	post.userId = post.userName;
@@ -277,48 +249,6 @@ function getPost(postTable) {
 	return post;
 }
 
-function getVBulletinPost(postTable) {
-	if (!postTable || !postTable.parentNode || !postTable.parentNode.parentNode) { GM_log("error 11"); return null; }
-	postTable = postTable.parentNode.parentNode;
-	var post = {
-		table: postTable,
-		id: postTable.id.replace("post_", "")*1,
-		headerCell: postTable.children[0],
-        titleRow: postTable.children[0],
-        avatarRow: postTable.children[1].children[0],
-        postRow: postTable.children[1].children[1],
-        buttonRow: postTable.children[2],
-		postRows: [],
-		menu: null
-	};
-    var userAnchor = post.avatarRow.children[0].children[0].children[0];
-	post.userName = userAnchor.children[0].children[0].innerText ? userAnchor.children[0].children[0].innerText : userAnchor.children[0].children[0].textContent;
-	post.userId = post.userName;
-	var href = userAnchor.getAttribute("href");
-	if (href.match(/member\.php\?(\d+)-/)) {			
-		post.userId = RegExp.$1;
-	}
-	post.postRows.push(post.avatarRow);
-	post.postRows.push(post.postRow);
-	post.postRows.push(post.buttonRow);
-	post.titleDiv = post.headerCell.firstElementChild || post.headerCell.firstChild;
-	var postNumberDiv = post.headerCell.lastElementChild || post.headerCell.lastChild;
-	var postNumberLink = postNumberDiv.children[0];
-	post.postNumber = (postNumberLink.innerText || postNumberLink.textContent).replace("#", "")*1;
-	post.menu = document.getElementById(postTable.id + "_mafiamenu");
-	if(!post.menu) {
-		post.menu = document.createElement("div");
-		post.menu.id = postTable.id + "_mafiamenu";
-		post.menu.style.float = "left";
-		post.menu.style.width = "auto";
-		post.menu.style.verticalAlign = "top";
-		post.menu.innerHTML = '<span class="smalltext" id="' + postTable.id + '_postInfo"></span>&nbsp;&nbsp;';
-		post.headerCell.insertBefore(post.menu, post.titleDiv);
-	}
-	post.postInfo = document.getElementById(postTable.id + "_postInfo");
-	return post;
-}
-
 function joinObjects(objects, fieldName, separator, transform) {
     var result = "";
     for(var v = 0; v < objects.length; v++) {
@@ -330,11 +260,10 @@ function joinObjects(objects, fieldName, separator, transform) {
 
 function getPosts() {
 	var posts = [];
-    var r = isVBulletin ? xpath("//li[contains(@class, 'postcontainer')]/div[contains(@class, 'postdetails')]/div[contains(@class, 'userinfo')]") : xpath("//tr/td[contains(@class, 'post_author')]/strong/span/a");
+    var r = xpath("//tr/td[contains(@class, 'post_author')]/strong/span/a");
     if (!r) { GM_log("error 10"); return []; }
     for (var i = 0; i < r.length; i++) {
-        var postTable = isVBulletin ? r[i] : r[i].parentNode.parentNode.parentNode.parentNode.parentNode.parentNode.parentNode.parentNode.parentNode.parentNode;
-		var post = getPost(postTable);
+		var post = getPost(r[i].parentNode.parentNode.parentNode.parentNode.parentNode.parentNode.parentNode.parentNode.parentNode.parentNode);
 		posts.push(post);
 	}
 	return posts;
@@ -344,10 +273,6 @@ function fixThreadDisplay(filters)
 {
     var threadId = getCurrentThreadId();
 	var posts = getPosts();
-	for(var i = 0; i < posts.length; i++) {
-		var post = posts[i];
-		postsByPostId[post.id] = post;
-	}
     if(!filters[getCurrentThreadId()].isEnabled) {
         for (var i = 0; i < posts.length; i++) {
             var post = posts[i];
@@ -387,11 +312,11 @@ function fixThreadDisplay(filters)
 		if(postInfo == null) postInfo = "Post by " + post.userName;
 		post.postInfo.innerHTML = postInfo;
         if (show) {
-            var expandCollapse = createOrUpdateLink(post.menu, "_expandCollapse", "-", "#ff7777", "Hide this post", post.id, togglePost);
+            var expandCollapse = createOrUpdateLink(post.menu, "_expandCollapse", "-", "#ff7777", "Hide this post", post.table.id, togglePost);
             var toggleFilterLink = createOrUpdateLink(post.menu, "_toggleFilter", "x", "#ff7777", "Hide all posts by "+post.userName, post.userId, toggleFilter);
         }
         else {
-            var expandCollapse = createOrUpdateLink(post.menu, "_expandCollapse", "+", "#77ff77", "Show this post", post.id, togglePost);
+            var expandCollapse = createOrUpdateLink(post.menu, "_expandCollapse", "+", "#77ff77", "Show this post", post.table.id, togglePost);
             var toggleFilterLink = createOrUpdateLink(post.menu, "_toggleFilter", "v", "#77ff77", "Show all posts by "+post.userName, post.userId, toggleFilter);
         }
 		if(isolated) {
@@ -415,8 +340,8 @@ function fixThreadDisplay(filters)
 	    setThreadFilters(filters);
         // Compile tallies for all posts in current page
 		for (var i = 0; i < posts.length; i++) {
-			var redTally = compileTally(filters, posts[i], isVBulletin ? "Bold": "Red", "Lynch votes");
-			var greenTally = isVBulletin ? null : compileTally(filters, posts[i], "Green", "Green votes");
+			var redTally = compileTally(filters, posts[i], "Red", "Lynch votes");
+			var greenTally = compileTally(filters, posts[i], "Green", "Green votes");
 			var t = document.getElementById(posts[i].menu.id + "_tally");
 			if(!t) {
 				posts[i].tallyDiv = document.createElement("div");
@@ -448,38 +373,7 @@ function fixThreadDisplay(filters)
 	}
 }
 
-function createVBulletinPreviewForm(postId, subject, message, buttonText) {
-    var threadId = getCurrentThreadId().substring(1);
-    var form = "<form action=\"newreply.php?do=postreply&t=" + threadId + "\" method=\"post\" enctype=\"multipart/form-data\" name=\"preview_" + postId + "\">";
-    var parameters = {
-        "title": subject,
-        "iconid": 0,
-        "message_backup": message,
-        "message": message,
-        "do": "postreply",
-		"p": postId,
-		"poststarttime": (new Date).getTime(),
-        //"posthash": "18c4db52b73c602f164deb17cc0391ee",
-        "t": threadId,
-		"multiquoteempty": "only",
-		"preview": "Preview Post",
-		"parseurl": 1,
-		"htmlstate": "on_nl2br",
-		"wysiwyg": 0,
-		"s": "",
-		"securitytoken": SECURITYTOKEN,
-		//"loggedinuser": 100369,
-		"specifiedpost": 1
-    };
-    for(var key in parameters) {
-        form += "<input type=\"hidden\" name=\"" + key + "\" value=\"" + parameters[key] + "\">";
-    }
-    form += "<input type=\"submit\" class=\"button\" style=\"margin: 0em; height: 16px; font-size: 8px;\" name=\"previewpost\" value=\"" + buttonText + "\"></form>";
-    return form;
-}
-
 function createPreviewForm(postId, subject, message, buttonText) {
-	if(isVBulletin) return createVBulletinPreviewForm(postId, subject, message, buttonText);
     var threadId = getCurrentThreadId().substring(1);
     var form = "<form action=\"newreply.php?tid=" + threadId + "&amp;processed=1\" method=\"post\" enctype=\"multipart/form-data\" name=\"preview_" + postId + "\">";
     var parameters = {
@@ -510,9 +404,7 @@ function createTallyText(tally) {
 	var text = "";
 	for(var i = 0; i < tally.length; i++) {
 		var t = tally[i];
-		if(t) {
-			text += t.count + " votes: " + t.votee + " (" + joinObjects(t.voters, "voter", ", ") + ")\n";
-		}
+		text += t.count + " votes: " + t.votee + " (" + joinObjects(t.voters, "voter", ", ") + ")\n";
 	}
 	return text;
 }
@@ -520,37 +412,26 @@ function createTallyText(tally) {
 function createTallyPost(tallies) {
     if(!tallies || tallies.length == 0) return "No votes.\n";
 	var text = "";
-	var forumUrl = window.location.toString();
-	forumUrl = forumUrl.substring(0,forumUrl.indexOf("showthread.php"))
     for(var j = 0; j < tallies.length; j++) {
         var tally = tallies[j];
-		if(tally) {
-			text += "[B]" + (tally.header || "Lynch votes") + "[/B]\n";
-			if (!tally.tally || tally.tally.length == 0) {
-				text += "No votes.\n\n";
-			}
-			else {
-				for(var i = 0; i < tally.tally.length; i++) {
-					var t = tally.tally[i];
-					text += t.count + " votes: " + t.votee + " (" + joinObjects(t.voters, null, ", ", function(vote) {
-						if(vote.postId)
-							return isVBulletin ? 
-									("[url=" + forumUrl + "showthread.php?" + getCurrentThreadId().substring(1) + "&p=" + vote.postId + "#post" + vote.postId + "]" + vote.voter + "[/url]") :
-									("[url=" + forumUrl + "showthread.php?tid=" + getCurrentThreadId().substring(1) + "&pid=" + vote.postId + "#pid" + vote.postId + "]" + vote.voter + "[/url]");
-						else
-							return vote.voter;
-					}) + ")\n";
-				}
-				if(isVBulletin)
-					text += "\nVoting history:[SPOILER]" + joinObjects(tally.history, null, "\n", function(vote) {
-						return "[quote=" + vote.voter + (vote.postId ? (";" + vote.postId): "") + "][color=" + (vote.voteType || "#FF0000") + "]" + vote.votee + "[/color][/quote]";
-					}) + "[/SPOILER]\n\n";
-				else
-					text += "\nVoting history:[SPOILER]" + joinObjects(tally.history, null, "\n", function(vote) {
-						return "[quote='" + vote.voter + "'" + (vote.postId ? " pid='" + vote.postId + "'" : "") + "][color=" + (vote.voteType || "#FF0000") + "]" + vote.votee + "[/color][/quote]";
-					}) + "[/SPOILER]\n\n";
-			}
-		}
+        text += "[B]" + (tally.header || "Lynch votes") + "[/B]\n";
+        if (!tally.tally || tally.tally.length == 0) {
+            text += "No votes.\n\n";
+        }
+        else {
+        	for(var i = 0; i < tally.tally.length; i++) {
+	        	var t = tally.tally[i];
+                text += t.count + " votes: " + t.votee + " (" + joinObjects(t.voters, null, ", ", function(vote) {
+                    if(vote.postId)
+                    	return "[url=http://realmsbeyond.net/forums/showthread.php?tid=" + getCurrentThreadId().substring(1) + "&pid=" + vote.postId + "#pid" + vote.postId + "]" + vote.voter + "[/url]";
+                    else
+                        return vote.voter;
+		        }) + ")\n";
+	        }
+            text += "\nVoting history:[SPOILER]" + joinObjects(tally.history, null, "\n", function(vote) {
+                return "[quote='" + vote.voter + "'" + (vote.postId ? " pid='" + vote.postId + "'" : "") + "][color=" + (vote.voteType || "#FF0000") + "]" + vote.votee + "[/color][/quote]";
+            }) + "[/SPOILER]\n\n";
+        }
     }
 	return text;
 }
@@ -627,12 +508,12 @@ function toggleDayStart(linkNode, postNumber) {
 	fixThreadDisplay(filters);
 }
 
-function togglePost(linkNode, postId) {
-	var post = postsByPostId[postId];
-    var show = (post.postRows[0].style.display == "none");
-	for(var k = 0; k < post.postRows.length; k++) {
-		post.postRows[k].style.display = (show ? "" : "none");
-	}
+function togglePost(linkNode, postTableId) {
+    var pt = document.getElementById(postTableId);
+    var show = (pt.children[0].children[1].style.display == "none");
+    for(var k = 1; k < pt.children[0].children.length; k++) {
+        pt.children[0].children[k].style.display = (show ? "" : "none");
+    }
     updateLink(linkNode, show ? "-" : "+", show ? "#ff7777" : "#77ff77", show ? "Hide this post" : "Show this post");
 }
 
@@ -807,24 +688,15 @@ function updatePosters(filters, posts) {
 function fixHeader(filters) {
     var menu = document.getElementById("MafiaHelperMenu");
     if(!menu) {
-		var insertBeforeDiv = document.getElementById("postlist_popups");
-        if(insertBeforeDiv) {
-			isVBulletin = true;
-		}
-		else {
-			var postsDiv = document.getElementById("posts");
-			if(postsDiv) {
-				var titleTable = postsDiv.previousElementSibling || previousSibling;
-				var modeDiv = titleTable.children[0].children[0].children[0].children[0];
-				insertBeforeDiv = modeDiv.children[0]
-			}
-		}
-        if(!insertBeforeDiv) return;
+        var postsDiv = document.getElementById("posts");
+        if(!postsDiv) return;
+        var titleTable = postsDiv.previousElementSibling || previousSibling;
+        var modeDiv = titleTable.children[0].children[0].children[0].children[0];
         var span = document.createElement("SPAN");
         span.id = "MafiaHelperMenu";
         span.style.marginRight = "1em";
         span.innerHTML = "<span id='MafiaHelperMenu_UserMenu' style='margin-right: 1em'>";
-        insertBeforeDiv.parentNode.insertBefore(span, insertBeforeDiv);
+        modeDiv.insertBefore(span, modeDiv.children[0]);
         menu = span;
     }
     var enabled = filters[getCurrentThreadId()] && filters[getCurrentThreadId()].isEnabled;
