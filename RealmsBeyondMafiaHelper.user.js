@@ -239,20 +239,19 @@ function countSpoileredQuotes(quotes) {
 
 function getPost(postTable) {
 	if(isVBulletin) return getVBulletinPost(postTable);
-  console.log(postTable);
-	if (!postTable || postTable.nodeName != "TABLE") { console.log("error 11"); return null; }
+	if (!postTable || postTable.nodeName != "DIV") { console.log("error 11"); return null; }
 	var post = {
 		table: postTable,
 		id: postTable.id.replace("post_", "")*1,
 		headerCell: postTable.children[0].children[0].children[0],
         titleRow: postTable.children[0].children[0],
-        avatarRow: postTable.children[0].children[1],
-        postRow: postTable.children[0].children[2],
-        buttonRow: postTable.children[0].children[3],
+        avatarRow: postTable.children[0],
+        postRow: postTable.children[1],
+        buttonRow: postTable.children[2],
 		postRows: [],
 		menu: null
 	};
-    var userAnchor = post.avatarRow.children[0].children[0].children[0].children[0].children[1].children[0].children[0].children[0];
+    var userAnchor = post.avatarRow.children[0].children[0].children[0].children[0];
 	post.userName = userAnchor.innerText ? userAnchor.innerText : userAnchor.textContent;
 	post.userId = post.userName;
 	var href = userAnchor.getAttribute("href");
@@ -263,8 +262,8 @@ function getPost(postTable) {
 	post.postRows.push(post.postRow);
 	post.postRows.push(post.buttonRow);
 	post.titleDiv = post.headerCell.firstElementChild || post.headerCell.firstChild;
-	var postNumberDiv = post.headerCell.lastElementChild || post.headerCell.lastChild;
-	var postNumberLink = postNumberDiv.children[0].children[0].children[0];
+	var postNumberDiv = post.headerCell.children[0];
+	var postNumberLink = postNumberDiv.children[0];
 	post.postNumber = (postNumberLink.innerText || postNumberLink.textContent).replace("#", "")*1;
 	post.menu = document.getElementById(postTable.id + "_mafiamenu");
 	if(!post.menu) {
@@ -333,14 +332,15 @@ function joinObjects(objects, fieldName, separator, transform) {
 
 function getPosts() {
 	var posts = [];
-    var r = isVBulletin ? xpath("//li[contains(@class, 'postcontainer')]/div[contains(@class, 'postdetails')]/div[contains(@class, 'userinfo')]") : xpath("//div[contains(@class, 'author_information')]/strong/span/a");
+    var r = isVBulletin ? xpath("//li[contains(@class, 'postcontainer')]/div[contains(@class, 'postdetails')]/div[contains(@class, 'userinfo')]") : xpath("//div[contains(@class, 'author_information')]");
     if (!r) { console.log("error 10"); return []; }
     for (var i = 0; i < r.length; i++) {
-        var postTable = isVBulletin ? r[i] : r[i].parentNode.parentNode.parentNode.parentNode.parentNode.parentNode.parentNode.parentNode.parentNode.parentNode;
+        var postTable = isVBulletin ? r[i] : r[i].parentNode.parentNode;
 		var post = getPost(postTable);
 		posts.push(post);
 	}
 	return posts;
+  console.log(posts);
 }
 
 function fixThreadDisplay(filters)
