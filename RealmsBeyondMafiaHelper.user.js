@@ -93,6 +93,7 @@ function _countVote(postNode, voteSpan, votesByPostNumber, aliases, colorFunctio
 		}
 		votee = getCanonicalPlayerName(votee, aliases);
 		var post = getPost(postNode);
+    
 		votesByPostNumber["p" + post.postNumber] = votesByPostNumber["p" + post.postNumber] || [];
 		votesByPostNumber["p" + post.postNumber].push({voterId: post.userId, voter: post.userName, votee: votee, postId: post.id, voteType: voteType});
 		//console.log("Post " + post.postNumber + " User " + post.userName + " (" + post.userId + ") votes " + votee);
@@ -190,6 +191,8 @@ function countVotes(threadId, filters) {
             console.log("Error processing potential vote " + v + ": " + err);
         }
     }
+  	console.log(filters[threadId].votes);
+  	console.log(filters[threadId].votes.countVotes);
     if(!(filters[threadId] && filters[threadId].votes && filters[threadId].votes.countVotes)) return votesByPostNumber;
 	filters[threadId].votes.votesByPostNumber = filters[threadId].votes.votesByPostNumber || {};
     for(var postId in votesByPostNumber) {
@@ -266,6 +269,7 @@ function getPost(postTable) {
 	var postNumberDiv = post.headerCell.children[0];
 	var postNumberLink = postNumberDiv.children[0];
 	post.postNumber = (postNumberLink.innerText || postNumberLink.textContent).replace("#", "")*1;
+  
 	post.menu = document.getElementById(postTable.id + "_mafiamenu");
 	if(!post.menu) {
 		post.menu = document.createElement("div");
@@ -274,7 +278,7 @@ function getPost(postTable) {
 		post.menu.style.width = "auto";
 		post.menu.style.verticalAlign = "top";
 		post.menu.innerHTML = '<span class="smalltext" id="' + postTable.id + '_postInfo"></span>&nbsp;&nbsp;';
-		post.headerCell.insertBefore(post.menu, post.titleDiv);
+		post.headerCell.appendChild(post.menu);
 	}
 	post.postInfo = document.getElementById(postTable.id + "_postInfo");
 	return post;
