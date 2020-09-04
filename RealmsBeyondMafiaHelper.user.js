@@ -40,6 +40,7 @@ if (notSupported) {
 
 function xpath(path, root)
 {
+    console.log(path);
     if (!root)
         root = document;
     var result = document.evaluate(path, root, null, XPathResult.ORDERED_NODE_SNAPSHOT_TYPE, null);
@@ -47,6 +48,7 @@ function xpath(path, root)
     for (var i = 0; i < result.snapshotLength; i++) {
         nodes[i] = result.snapshotItem(i);
     }
+  	console.log(nodes);
     return nodes;
 }
 
@@ -91,6 +93,7 @@ function _countVote(postNode, voteSpan, votesByPostNumber, aliases, colorFunctio
 		}
 		votee = getCanonicalPlayerName(votee, aliases);
 		var post = getPost(postNode);
+    
 		votesByPostNumber["p" + post.postNumber] = votesByPostNumber["p" + post.postNumber] || [];
 		votesByPostNumber["p" + post.postNumber].push({voterId: post.userId, voter: post.userName, votee: votee, postId: post.id, voteType: voteType});
 		//console.log("Post " + post.postNumber + " User " + post.userName + " (" + post.userId + ") votes " + votee);
@@ -154,7 +157,7 @@ function addAliases(aliasLists, aliasTexts) {
 
 function findAliases(threadId, filters) {
 	filters[threadId].aliases = filters[threadId].aliases || [];
-    var aliasNodes = isVBulletin ? xpath("//div[contains(@class, 'postbody')]/div/div/div/blockquote/ul/li") : xpath("//tr/td/div[contains(@class, 'post_body')]/ul/li").concat(xpath("//tr/td/div[contains(@class, 'post_body')]/span/ul/li"));
+    var aliasNodes = isVBulletin ? xpath("//div[contains(@class, 'postbody')]/div/div/div/blockquote/ul/li") : xpath("//div[contains(@class, 'post_body')]/ul/li").concat(xpath("//div[contains(@class, 'post_body')]/span/ul/li"));
     if(aliasNodes) for(var v = 0; v < aliasNodes.length; v++) {
         try {
             var aliasNode = aliasNodes[v];
@@ -175,19 +178,21 @@ function findAliases(threadId, filters) {
 function countVotes(threadId, filters) {
 	var aliases = filters[threadId].aliases || [];
     var votesByPostNumber = {};
-    var votes = isVBulletin ? [].concat(xpath("//div[contains(@class, 'postbody')]/div/div/div/blockquote/b"), xpath("//div[contains(@class, 'postbody')]/div/div/div/blockquote/font")) : xpath("//tr/td/div[contains(@class, 'post_body')]/span");
+    var votes = isVBulletin ? [].concat(xpath("//div[contains(@class, 'postbody')]/div/div/div/blockquote/b"), xpath("//div[contains(@class, 'postbody')]/div/div/div/blockquote/font")) : xpath("//div[contains(@class, 'post_body')]/span");
     console.log("Counting votes. Found " + (votes ? votes.length : null) + " potential votes.");
     if(votes) for(var v = 0; v < votes.length; v++) {
         try {
             var voteSpan = votes[v];
             //if(voteSpan.style && voteSpan.style.color) console.log(voteSpan.style.color);
-			var postNode = voteSpan.parentNode.parentNode.parentNode.parentNode.parentNode;
+			var postNode = voteSpan.parentNode.parentNode.parentNode;
             _countVoteRecursively(postNode, voteSpan, votesByPostNumber, aliases);
         }
         catch(err) {
             console.log("Error processing potential vote " + v + ": " + err);
         }
     }
+  	console.log(filters[threadId].votes);
+  	console.log(filters[threadId].votes.countVotes);
     if(!(filters[threadId] && filters[threadId].votes && filters[threadId].votes.countVotes)) return votesByPostNumber;
 	filters[threadId].votes.votesByPostNumber = filters[threadId].votes.votesByPostNumber || {};
     for(var postId in votesByPostNumber) {
@@ -211,9 +216,10 @@ function _countQuotes(xpathExpression, result) {
             quotee = quotee.replace(" Wrote:", "").trim();
             if(quotee == "Quote:") quotee = "unknown";
             var postTable = quote;
-            while(postTable.tagName != "TABLE" && postTable.parentNode) {
+            while(postTable.className != "post " && postTable.parentNode) {
                 postTable = postTable.parentNode;
             }
+            console.log(postTable);
             if(postTable.parentNode) {
                 var post = getPost(postTable);
                 result["p" + post.postNumber] = result["p" + post.postNumber] || [];
@@ -228,28 +234,28 @@ function _countQuotes(xpathExpression, result) {
 }
 
 function countQuotes(quotes) {
-    return _countQuotes("//tr/td/div[contains(@class, 'post_body')]/blockquote/cite", quotes);
+    return _countQuotes("//div[contains(@class, 'post_body')]/blockquote/cite", quotes);
 }
 
 function countSpoileredQuotes(quotes) {
-    return _countQuotes("//tr/td/div[contains(@class, 'post_body')]/div/div[contains(@class, 'quotecontent')]/div/blockquote/cite", quotes);
+    return _countQuotes("//div[contains(@class, 'post_body')]/div/div[contains(@class, 'quotecontent')]/div/blockquote/cite", quotes);
 }
 
 function getPost(postTable) {
 	if(isVBulletin) return getVBulletinPost(postTable);
-	if (!postTable || postTable.nodeName != "TABLE") { GM_log("error 11"); return null; }
+	if (!postTable || postTable.nodeName != "DIV") { console.log("error 11"); return null; }
 	var post = {
 		table: postTable,
 		id: postTable.id.replace("post_", "")*1,
 		headerCell: postTable.children[0].children[0].children[0],
         titleRow: postTable.children[0].children[0],
-        avatarRow: postTable.children[0].children[1],
-        postRow: postTable.children[0].children[2],
-        buttonRow: postTable.children[0].children[3],
+        avatarRow: postTable.children[0],
+        postRow: postTable.children[1],
+        buttonRow: postTable.children[2],
 		postRows: [],
 		menu: null
 	};
-    var userAnchor = post.avatarRow.children[0].children[0].children[0].children[0].children[1].children[0].children[0].children[0];
+    var userAnchor = post.avatarRow.children[2].children[0].children[0].children[0];
 	post.userName = userAnchor.innerText ? userAnchor.innerText : userAnchor.textContent;
 	post.userId = post.userName;
 	var href = userAnchor.getAttribute("href");
@@ -260,9 +266,10 @@ function getPost(postTable) {
 	post.postRows.push(post.postRow);
 	post.postRows.push(post.buttonRow);
 	post.titleDiv = post.headerCell.firstElementChild || post.headerCell.firstChild;
-	var postNumberDiv = post.headerCell.lastElementChild || post.headerCell.lastChild;
-	var postNumberLink = postNumberDiv.children[0].children[0].children[0];
+	var postNumberDiv = post.headerCell.children[0];
+	var postNumberLink = postNumberDiv.children[0];
 	post.postNumber = (postNumberLink.innerText || postNumberLink.textContent).replace("#", "")*1;
+  
 	post.menu = document.getElementById(postTable.id + "_mafiamenu");
 	if(!post.menu) {
 		post.menu = document.createElement("div");
@@ -271,14 +278,14 @@ function getPost(postTable) {
 		post.menu.style.width = "auto";
 		post.menu.style.verticalAlign = "top";
 		post.menu.innerHTML = '<span class="smalltext" id="' + postTable.id + '_postInfo"></span>&nbsp;&nbsp;';
-		post.headerCell.insertBefore(post.menu, post.titleDiv);
+		post.headerCell.appendChild(post.menu);
 	}
 	post.postInfo = document.getElementById(postTable.id + "_postInfo");
 	return post;
 }
 
 function getVBulletinPost(postTable) {
-	if (!postTable || !postTable.parentNode || !postTable.parentNode.parentNode) { GM_log("error 11"); return null; }
+	if (!postTable || !postTable.parentNode || !postTable.parentNode.parentNode) { console.log("error 11"); return null; }
 	postTable = postTable.parentNode.parentNode;
 	var post = {
 		table: postTable,
@@ -330,13 +337,14 @@ function joinObjects(objects, fieldName, separator, transform) {
 
 function getPosts() {
 	var posts = [];
-    var r = isVBulletin ? xpath("//li[contains(@class, 'postcontainer')]/div[contains(@class, 'postdetails')]/div[contains(@class, 'userinfo')]") : xpath("//tr/td[contains(@class, 'post_author')]/strong/span/a");
-    if (!r) { GM_log("error 10"); return []; }
+    var r = isVBulletin ? xpath("//li[contains(@class, 'postcontainer')]/div[contains(@class, 'postdetails')]/div[contains(@class, 'userinfo')]") : xpath("//div[contains(@class, 'post_content')]");
+    if (!r) { console.log("error 10"); return []; }
     for (var i = 0; i < r.length; i++) {
-        var postTable = isVBulletin ? r[i] : r[i].parentNode.parentNode.parentNode.parentNode.parentNode.parentNode.parentNode.parentNode.parentNode.parentNode;
+        var postTable = isVBulletin ? r[i] : r[i].parentNode;
 		var post = getPost(postTable);
 		posts.push(post);
 	}
+  console.log(posts);
 	return posts;
 }
 
@@ -794,12 +802,14 @@ function updatePosters(filters, posts) {
     var t = filters[getCurrentThreadId()];
     t.posters = t.posters || {};
     var changed = false;
+  console.log(posts);
     for (var i = 0; i < posts.length; i++) {
         if (t.posters[posts[i].userId] != posts[i].userName) {
         	t.posters[posts[i].userId] = posts[i].userName;
             changed = true;
         }
     }
+  console.log(filters);
     if (changed)
     	setThreadFilters(filters);
 }
@@ -814,9 +824,8 @@ function fixHeader(filters) {
 		else {
 			var postsDiv = document.getElementById("posts");
 			if(postsDiv) {
-				var titleTable = postsDiv.previousElementSibling || previousSibling;
-				var modeDiv = titleTable.children[0].children[0].children[0].children[0];
-				insertBeforeDiv = modeDiv.children[0]
+				var titleTable = postsDiv.previousElementSibling || postsDiv.previousSibling;
+        insertBeforeDiv = postsDiv.parentNode.parentNode.previousSibling.previousSibling.children[0].children[1]
 			}
 		}
         if(!insertBeforeDiv) return;
