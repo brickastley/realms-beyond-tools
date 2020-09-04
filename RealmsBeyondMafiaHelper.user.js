@@ -40,10 +40,10 @@ if (notSupported) {
 
 function xpath(path, root)
 {
+    console.log(path);
     if (!root)
         root = document;
     var result = document.evaluate(path, root, null, XPathResult.ORDERED_NODE_SNAPSHOT_TYPE, null);
-  	console.log(result);
     var nodes = [];
     for (var i = 0; i < result.snapshotLength; i++) {
         nodes[i] = result.snapshotItem(i);
@@ -156,7 +156,7 @@ function addAliases(aliasLists, aliasTexts) {
 
 function findAliases(threadId, filters) {
 	filters[threadId].aliases = filters[threadId].aliases || [];
-    var aliasNodes = isVBulletin ? xpath("//div[contains(@class, 'postbody')]/div/div/div/blockquote/ul/li") : xpath("//tr/td/div[contains(@class, 'post_body')]/ul/li").concat(xpath("//tr/td/div[contains(@class, 'post_body')]/span/ul/li"));
+    var aliasNodes = isVBulletin ? xpath("//div[contains(@class, 'postbody')]/div/div/div/blockquote/ul/li") : xpath("//div[contains(@class, 'post_body')]/ul/li").concat(xpath("//div[contains(@class, 'post_body')]/span/ul/li"));
     if(aliasNodes) for(var v = 0; v < aliasNodes.length; v++) {
         try {
             var aliasNode = aliasNodes[v];
@@ -177,13 +177,13 @@ function findAliases(threadId, filters) {
 function countVotes(threadId, filters) {
 	var aliases = filters[threadId].aliases || [];
     var votesByPostNumber = {};
-    var votes = isVBulletin ? [].concat(xpath("//div[contains(@class, 'postbody')]/div/div/div/blockquote/b"), xpath("//div[contains(@class, 'postbody')]/div/div/div/blockquote/font")) : xpath("//tr/td/div[contains(@class, 'post_body')]/span");
+    var votes = isVBulletin ? [].concat(xpath("//div[contains(@class, 'postbody')]/div/div/div/blockquote/b"), xpath("//div[contains(@class, 'postbody')]/div/div/div/blockquote/font")) : xpath("//div[contains(@class, 'post_body')]/span");
     console.log("Counting votes. Found " + (votes ? votes.length : null) + " potential votes.");
     if(votes) for(var v = 0; v < votes.length; v++) {
         try {
             var voteSpan = votes[v];
             //if(voteSpan.style && voteSpan.style.color) console.log(voteSpan.style.color);
-			var postNode = voteSpan.parentNode.parentNode.parentNode.parentNode.parentNode;
+			var postNode = voteSpan.parentNode.parentNode.parentNode;
             _countVoteRecursively(postNode, voteSpan, votesByPostNumber, aliases);
         }
         catch(err) {
@@ -213,9 +213,10 @@ function _countQuotes(xpathExpression, result) {
             quotee = quotee.replace(" Wrote:", "").trim();
             if(quotee == "Quote:") quotee = "unknown";
             var postTable = quote;
-            while(postTable.tagName != "TABLE" && postTable.parentNode) {
+            while(postTable.className != "post " && postTable.parentNode) {
                 postTable = postTable.parentNode;
             }
+            console.log(postTable);
             if(postTable.parentNode) {
                 var post = getPost(postTable);
                 result["p" + post.postNumber] = result["p" + post.postNumber] || [];
@@ -230,11 +231,11 @@ function _countQuotes(xpathExpression, result) {
 }
 
 function countQuotes(quotes) {
-    return _countQuotes("//tr/td/div[contains(@class, 'post_body')]/blockquote/cite", quotes);
+    return _countQuotes("//div[contains(@class, 'post_body')]/blockquote/cite", quotes);
 }
 
 function countSpoileredQuotes(quotes) {
-    return _countQuotes("//tr/td/div[contains(@class, 'post_body')]/div/div[contains(@class, 'quotecontent')]/div/blockquote/cite", quotes);
+    return _countQuotes("//div[contains(@class, 'post_body')]/div/div[contains(@class, 'quotecontent')]/div/blockquote/cite", quotes);
 }
 
 function getPost(postTable) {
@@ -251,7 +252,7 @@ function getPost(postTable) {
 		postRows: [],
 		menu: null
 	};
-    var userAnchor = post.avatarRow.children[0].children[0].children[0].children[0];
+    var userAnchor = post.avatarRow.children[2].children[0].children[0].children[0];
 	post.userName = userAnchor.innerText ? userAnchor.innerText : userAnchor.textContent;
 	post.userId = post.userName;
 	var href = userAnchor.getAttribute("href");
@@ -332,15 +333,15 @@ function joinObjects(objects, fieldName, separator, transform) {
 
 function getPosts() {
 	var posts = [];
-    var r = isVBulletin ? xpath("//li[contains(@class, 'postcontainer')]/div[contains(@class, 'postdetails')]/div[contains(@class, 'userinfo')]") : xpath("//div[contains(@class, 'author_information')]");
+    var r = isVBulletin ? xpath("//li[contains(@class, 'postcontainer')]/div[contains(@class, 'postdetails')]/div[contains(@class, 'userinfo')]") : xpath("//div[contains(@class, 'post_content')]");
     if (!r) { console.log("error 10"); return []; }
     for (var i = 0; i < r.length; i++) {
-        var postTable = isVBulletin ? r[i] : r[i].parentNode.parentNode;
+        var postTable = isVBulletin ? r[i] : r[i].parentNode;
 		var post = getPost(postTable);
 		posts.push(post);
 	}
-	return posts;
   console.log(posts);
+	return posts;
 }
 
 function fixThreadDisplay(filters)
@@ -797,12 +798,14 @@ function updatePosters(filters, posts) {
     var t = filters[getCurrentThreadId()];
     t.posters = t.posters || {};
     var changed = false;
+  console.log(posts);
     for (var i = 0; i < posts.length; i++) {
         if (t.posters[posts[i].userId] != posts[i].userName) {
         	t.posters[posts[i].userId] = posts[i].userName;
             changed = true;
         }
     }
+  console.log(filters);
     if (changed)
     	setThreadFilters(filters);
 }
